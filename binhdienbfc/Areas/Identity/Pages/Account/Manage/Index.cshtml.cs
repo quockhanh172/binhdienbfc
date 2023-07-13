@@ -6,7 +6,9 @@ using System;
 using System.ComponentModel.DataAnnotations;
 using System.Text.Encodings.Web;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 using binhdienbfc.Data;
+using binhdienbfc.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -17,13 +19,16 @@ namespace binhdienbfc.Areas.Identity.Pages.Account.Manage
     {
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly SignInManager<ApplicationUser> _signInManager;
+        private readonly IFileService _fileService;
 
         public IndexModel(
             UserManager<ApplicationUser> userManager,
-            SignInManager<ApplicationUser> signInManager)
+            SignInManager<ApplicationUser> signInManager,
+            IFileService fileService)
         {
             _userManager = userManager;
             _signInManager = signInManager;
+            this._fileService = fileService;
         }
 
         /// <summary>
@@ -59,6 +64,9 @@ namespace binhdienbfc.Areas.Identity.Pages.Account.Manage
             [Phone]
             [Display(Name = "Phone number")]
             public string PhoneNumber { get; set; }
+            public string Name { get; set; }
+            public string ProfilePicture { get; set; }
+            public IFormFile ImageFile { get; set; }
         }
 
         private async Task LoadAsync(ApplicationUser user)
@@ -70,7 +78,9 @@ namespace binhdienbfc.Areas.Identity.Pages.Account.Manage
 
             Input = new InputModel
             {
-                PhoneNumber = phoneNumber
+                PhoneNumber = phoneNumber,
+                Name = user.Name,
+                ProfilePicture =user.ProfilePicture,
             };
         }
 
@@ -108,6 +118,24 @@ namespace binhdienbfc.Areas.Identity.Pages.Account.Manage
                 {
                     StatusMessage = "Unexpected error when trying to set phone number.";
                     return RedirectToPage();
+                }
+            }
+            if(Input.Name != user.Name) 
+            {
+                user.Name= Input.Name;
+                await _userManager.UpdateAsync(user);
+            }
+
+            //code for image upload
+            if(Input.ImageFile != null)
+            {
+                var result = _fileService.SaveImage(Input.ImageFile);
+                if (result.Item1 == 1)
+                {
+                    var oldImage = user.ProfilePicture;
+                    user.ProfilePicture = result.Item2;
+                    await _userManager.UpdateAsync(user);
+                    var deleteResult = _fileService.DeleteImage(oldImage);
                 }
             }
 
